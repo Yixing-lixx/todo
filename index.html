@@ -1340,7 +1340,7 @@ function openSettings(){
       <div class="field"><label for="cfgStart">一天从几点开始</label><input id="cfgStart" type="time" class="inp" data-k="dayStart" value="${fmtHM(st.dayStart)}"><p class="tip">「接在那天最后」「指定时间插入」在空白的一天会从这个时间排起。</p></div>
       <div class="field"><span class="lab">没做完的原因选项</span><div class="chips">${st.reasons.map(r=>`<button class="chip" data-act="cfg-rm" data-v="${esc(r)}" aria-label="删除选项 ${esc(r)}">${esc(r)}<span class="rmx">×</span></button>`).join('')}</div>
         <div class="inline-add"><input class="inp" data-k="newReason" placeholder="新的原因选项" value="${esc(st.newReason)}" aria-label="新的原因选项"><button class="chip" data-act="cfg-add">添加</button></div></div>
-      <div class="field"><span class="lab">数据</span><p class="dataline">${where}</p>
+      <div class="field"><span class="lab">数据</span><p class="dataline">${where}</p><p class="tip" style="margin:0">版本 ${APP_VERSION}</p>
         <div class="chips">${Store.mode==='cloud'?'<button class="chip" data-act="cfg-sync">立即同步</button><button class="chip" data-act="cfg-resync">从云端重新下载全部</button><button class="chip" data-act="cfg-out">退出登录</button>':'<button class="chip" data-act="cfg-login">登录以同步</button>'}</div>
         <div class="chips"><button class="chip" data-act="cfg-export">复制备份</button><button class="chip" data-act="cfg-import-open" aria-pressed="${st.showImport}">从备份导入</button></div>
         ${st.exportText!=null?`<textarea class="inp" rows="4" readonly aria-label="备份内容" onfocus="this.select()">${esc(st.exportText)}</textarea><p class="tip">自动复制没成功，请手动全选复制上面的内容。</p>`:''}
@@ -1427,7 +1427,11 @@ $('#btnSettings').innerHTML=svg(P.sliders);$('#addSend').innerHTML=svg(P.send,2.
 let lastToday=today();
 setInterval(()=>{const td=today();if(td!==lastToday){if(S.day===lastToday)S.day=td;lastToday=td;}if(!document.hidden&&S.tab==='day'&&S.loaded&&!Sheet.cur&&Store.mode!=='auth')renderAll();},60000);
 renderAll();Store.init();Mic.init();
-if('serviceWorker' in navigator&&location.protocol!=='file:')window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+const APP_VERSION='2026-11-26 · 计时';
+if('serviceWorker' in navigator&&location.protocol!=='file:'){
+  const hadController=!!navigator.serviceWorker.controller;let reloaded=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadController&&!reloaded){reloaded=true;location.reload();}});
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{r.update().catch(()=>{});document.addEventListener('visibilitychange',()=>{if(!document.hidden)r.update().catch(()=>{});});}).catch(()=>{}));}
 </script>
 </body>
 </html>
