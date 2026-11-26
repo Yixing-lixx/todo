@@ -1,5 +1,5 @@
 // 日程任务本 – offline cache. Bump VERSION when files change so phones pick up the update.
-const VERSION = 'rwb-v1';
+const VERSION = 'rwb-v2';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './apple-touch-icon.png',

@@ -74,6 +74,22 @@ button.sync{border-radius:99px;padding:4px 6px}
 .tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);border-color:var(--line);box-shadow:var(--shadow)}
 main{padding-bottom:40px}
 main.pad-lg{padding-bottom:150px}
+main.pad-xl{padding-bottom:215px}
+.t-timer{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--accent);background:var(--accent-soft)}
+.t-timer svg{width:16px;height:16px}
+.t-timer.on{background:var(--bad);color:#fff}
+.tag.timing{background:var(--bad-soft);color:var(--bad);border-color:transparent;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.task.is-timing{border-color:var(--bad);box-shadow:inset 0 0 0 1px var(--bad)}
+.task.is-timing,.task.is-timing.is-now{border-color:var(--bad);box-shadow:inset 0 0 0 1px var(--bad)}
+.task.is-timing .t-rail,.task.is-timing.is-now .t-rail{background:var(--bad)}
+.timerbar{position:fixed;left:12px;right:12px;z-index:21;max-width:696px;margin:0 auto;display:flex;align-items:center;gap:8px;padding:9px 9px 9px 14px;border-radius:14px;background:var(--ink);color:var(--bg);box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.tb-dot{width:8px;height:8px;border-radius:50%;background:var(--bad);flex:none;animation:blink 1.4s ease-in-out infinite}
+@keyframes blink{50%{opacity:.25}}
+.timerbar .tb-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;text-align:left}
+.tb-c{font-family:var(--font-mono);font-weight:600;font-variant-numeric:tabular-nums;font-size:15px}
+.timerbar .tb-b{padding:7px 11px;border-radius:9px;font-size:13px;font-weight:700;background:color-mix(in srgb,var(--bg) 18%,transparent);color:var(--bg);flex:none}
+.timerbar .tb-b.fin{background:var(--hi);color:var(--hi-ink)}
+body.timing .toast{bottom:calc(178px + env(safe-area-inset-bottom))}
 .loading{padding:60px 0;text-align:center;color:var(--muted)}
 
 /* head card */
@@ -118,7 +134,7 @@ main.pad-lg{padding-bottom:150px}
 .sec-h{display:flex;align-items:center;gap:8px;margin:20px 2px 8px;font-size:12px;letter-spacing:.06em;color:var(--muted);font-weight:600}
 .sec-h::after{content:"";flex:1;height:1px;background:var(--line)}
 .list{display:grid;gap:6px}
-.task{display:grid;grid-template-columns:46px 3px 30px minmax(0,1fr) 30px;align-items:center;gap:0 9px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 4px 8px 10px;min-height:58px}
+.task{display:grid;grid-template-columns:46px 3px 30px minmax(0,1fr) 34px 30px;align-items:center;gap:0 9px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 4px 8px 10px;min-height:58px}
 .t-time{font-family:var(--font-mono);font-size:12.5px;display:grid;line-height:1.3;font-variant-numeric:tabular-nums}
 .t-time b{font-weight:600}.t-time span{color:var(--muted)}
 .t-time{cursor:pointer}
@@ -342,6 +358,7 @@ textarea.inp{resize:vertical;line-height:1.5}
   </div>
 </div>
 <div class="selaction" id="selaction" hidden></div>
+<div class="timerbar" id="timerbar" role="status" hidden></div>
 <div id="sheet-root"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -558,6 +575,8 @@ const P={
   sliders:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
+  play:'<path d="M8 5.5v13l10.5-6.5z"/>',
+  pause:'<path d="M9 6v12M15 6v12"/>',
   dots:'<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>',
 };
 const svg=(p,w=2)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -727,7 +746,7 @@ function renderAll(){
   if(!S.loaded||Store.mode==='loading'){v.innerHTML='<div class="loading">正在载入你的任务…</div>';v.dataset.view='';}
   else if(Store.mode==='auth'){if(v.dataset.view!=='auth'){v.innerHTML=renderAuth();v.dataset.view='auth';}}
   else{v.innerHTML=S.tab==='day'?renderDay():S.tab==='week'?renderWeek():renderReview();v.dataset.view=S.tab;}
-  renderBar();updateMicButtons();
+  renderBar();renderTimerBar();updateMicButtons();
 }
 function renderBar(){
   const showAdd=S.tab!=='review'&&!S.sel&&(Store.mode==='cloud'||Store.mode==='local');
@@ -738,7 +757,7 @@ function renderBar(){
   $('#view').classList.toggle('pad-lg',showAdd||!!S.sel);
 }
 function meterHTML(st){const w=n=>st.n?(n/st.n*100).toFixed(1):0;
-  return `<div class="meter"><div class="meter-nums"><span>计划 <b>${fmtHours(st.plan)}</b></span><span>完成 <b>${st.done}/${st.n}</b></span>${st.part?`<span>部分 <b>${st.part}</b></span>`:''}${st.adhoc?`<span>临时 <b>${st.adhoc}</b></span>`:''}<span>完成率 <b>${Math.round(st.rate*100)}%</b></span></div><div class="bar" role="img" aria-label="完成 ${st.done} 项，共 ${st.n} 项"><i class="b-ok" style="width:${w(st.done)}%"></i><i class="b-warn" style="width:${w(st.part)}%"></i></div></div>`;}
+  return `<div class="meter"><div class="meter-nums"><span>计划 <b>${fmtHours(st.plan)}</b></span><span>完成 <b>${st.done}/${st.n}</b></span>${st.part?`<span>部分 <b>${st.part}</b></span>`:''}${st.adhoc?`<span>临时 <b>${st.adhoc}</b></span>`:''}<span>完成率 <b>${Math.round(st.rate*100)}%</b></span>${st.trackedMs>=60000?`<span>计时 <b>${fmtDur(Math.round(st.trackedMs/60000))}</b></span>`:''}</div><div class="bar" role="img" aria-label="完成 ${st.done} 项，共 ${st.n} 项"><i class="b-ok" style="width:${w(st.done)}%"></i><i class="b-warn" style="width:${w(st.part)}%"></i></div></div>`;}
 function weekStripHTML(d){const w=monday(d),td=today();let h='<div class="wstrip">';
   for(let i=0;i<7;i++){const x=addDays(w,i);const s=stats(tasksOfDay(x));
     h+=`<button class="wcell${x===d?' on':''}${x===td?' today':''}" data-act="day-pick" data-d="${x}" aria-label="${mdLabel(x)} ${WD[i+1]}，完成 ${s.done}/${s.n}"><span>${'一二三四五六日'[i]}</span><b>${pd(x).getDate()}</b><span class="mini"><i style="width:${s.n?Math.round(s.rate*100):0}%"></i></span><span class="sdot${S.sums.has(x)?' y':''}"></span></button>`;}
@@ -750,7 +769,7 @@ function renderDay(){
   const timed=list.filter(t=>t.start!=null).sort(byStart);
   const untimed=list.filter(t=>t.start==null).sort((a,b)=>(a.created||0)-(b.created||0));
   const sum=S.sums.get(d);
-  const st=sum&&sum.stats?{...sum.stats,skip:0}:stats(list);
+  const st=sum&&sum.stats?{...sum.stats,skip:0}:stats(list);st.trackedMs=list.reduce((a,t)=>a+trackedMs(t),0);
   const dt=pd(d);
   let h=`<section class="dayhead"><div class="dh-row">
     <button class="icon" data-act="day-prev" aria-label="前一天">${svg(P.left,2.2)}</button>
@@ -790,6 +809,29 @@ function renderDay(){
   }
   return h;}
 const nowLine=nm=>`<div class="nowline"><span>现在 ${fmtHM(nm)}</span></div>`;
+/* ---------- timer ---------- */
+const trackedMs=t=>(t.tracked||0)+(t.timerStart?Math.max(0,Date.now()-t.timerStart):0);
+const fmtClock=ms=>{const x=Math.floor(ms/1000),h=Math.floor(x/3600),m=Math.floor(x%3600/60),sec=x%60;return (h?h+':'+pad(m):m)+':'+pad(sec);};
+const runningTask=()=>allTasks().find(t=>t.timerStart&&t.kind!=='goal');
+function pauseTimer(t){if(!t||!t.timerStart)return t;const e=Date.now();
+  const sessions=[...(t.sessions||[]),{s:t.timerStart,e}].slice(-40);const tracked=(t.tracked||0)+(e-t.timerStart);
+  return Store.saveTask({...t,timerStart:null,tracked,sessions,actual:Math.max(1,Math.round(tracked/60000))});}
+function startTimer(id){const r=runningTask();if(r&&r.id!==id)pauseTimer(r);const t=S.tasks.get(id);if(!t)return;
+  Store.saveTask({...t,timerStart:Date.now(),status:t.status==='done'||t.status==='skipped'?'todo':t.status});
+  renderAll();toast(r&&r.id!==id?`已暂停「${r.title}」，开始计时「${t.title}」`:`开始计时「${t.title}」`);}
+function finishTimer(id){let t=S.tasks.get(id);if(!t)return;t=pauseTimer(t);t=Store.saveTask({...t,status:'done'});renderAll();
+  toast(`已完成「${t.title}」${t.tracked?`，计时 ${fmtDur(Math.round(t.tracked/60000))}`:''}`,{label:'写评价',fn:()=>openDone(id)},8000);}
+function sessionsText(t){const ss=(t.sessions||[]).map(x=>`${fmtHM(minOf(x.s))}–${fmtHM(minOf(x.e))}`);if(t.timerStart)ss.push(`${fmtHM(minOf(t.timerStart))}–进行中`);return ss.join(' · ');}
+const minOf=ms=>{const d=new Date(ms);return d.getHours()*60+d.getMinutes();};
+function renderTimerBar(){const el=$('#timerbar');if(!el)return;const t=(Store.mode==='cloud'||Store.mode==='local')?runningTask():null;
+  document.body.classList.toggle('timing',!!t);
+  if(!t){el.hidden=true;$('#view').classList.remove('pad-xl');return;}
+  el.hidden=false;
+  el.innerHTML=`<span class="tb-dot" aria-hidden="true"></span><button class="tb-t" data-act="open-day" data-d="${t.day==='backlog'?today():t.day}">${esc(t.title)}</button><span class="tb-c" data-run="${t.timerStart}" data-base="${t.tracked||0}" data-plain="1">${fmtClock(trackedMs(t))}</span><button class="tb-b" data-act="timer-pause" data-id="${t.id}">暂停</button><button class="tb-b fin" data-act="timer-finish" data-id="${t.id}">结束</button>`;
+  const ab=$('#addbar'),sa=$('#selaction');const below=!ab.hidden?ab:(!sa.hidden?sa:null);
+  el.style.bottom=below?(below.offsetHeight-8)+'px':'calc(12px + env(safe-area-inset-bottom))';
+  $('#view').classList.add('pad-xl');}
+setInterval(()=>{const now=Date.now();document.querySelectorAll('[data-run]').forEach(el=>{el.textContent=(el.dataset.plain?'':'● ')+fmtClock(+el.dataset.base+now-(+el.dataset.run));});},1000);
 function taskRow(t,o={}){
   const sel=S.sel,isSel=!!(sel&&sel.has(t.id));
   const goal=t.goalId?S.tasks.get(t.goalId):null;
@@ -798,6 +840,8 @@ function taskRow(t,o={}){
   if(t.status==='skipped')meta.push('<span class="tag">已放弃</span>');
   if((t.status==='done'||t.status==='partial')&&t.actual!=null){const df=t.actual-(t.dur||0),tol=Math.max(10,(t.dur||0)*0.15);meta.push(`<span class="tag ${df>tol?'warn':df<-tol?'ok':''}">实际 ${fmtDur(t.actual)}${df?`（${df>0?'+':'−'}${fmtDur(Math.abs(df))}）`:''}</span>`);}
   if(t.status==='done'&&t.ev)meta.push(`<span class="tag">${EVAL_L[t.ev]||''}</span>`);
+  if(t.timerStart)meta.push(`<span class="tag timing" data-run="${t.timerStart}" data-base="${t.tracked||0}">● ${fmtClock(trackedMs(t))}</span>`);
+  else if(t.tracked&&isActive(t))meta.push(`<span class="tag">已计时 ${fmtDur(Math.round(t.tracked/60000))}</span>`);
   if(o.cur)meta.push('<span class="tag now">进行中</span>');
   if(t.focus)meta.push('<span class="tag focus">重点</span>');
   if(goal)meta.push(`<span class="tag goal">${esc(goal.title)}</span>`);
@@ -806,10 +850,10 @@ function taskRow(t,o={}){
   if(o.ov)meta.push('<span class="tag bad">时间重叠</span>');
   if(t.note)meta.push(`<span title="${esc(t.note)}">有备注</span>`);
   const time=t.start!=null?`<b>${fmtHM(t.start)}</b><span>${fmtHM(t.start+(t.dur||0))}</span>`:'<span>—</span>';
-  const cls=`task st-${t.status}${o.cur?' is-now':''}${o.ov?' is-ov':''}${isSel?' is-sel':''}${sel?' selmode':''}`;
+  const cls=`task st-${t.status}${t.timerStart?' is-timing':''}${o.cur?' is-now':''}${o.ov?' is-ov':''}${isSel?' is-sel':''}${sel?' selmode':''}`;
   const check=sel?`<button class="t-check sq" data-act="sel-toggle" aria-pressed="${isSel}" aria-label="选择「${esc(t.title)}」">${svg(P.check,3)}</button>`
     :`<button class="t-check" data-act="toggle" aria-label="${t.status==='done'?'标记为未完成':'标记完成'}：${esc(t.title)}">${svg(P.check,3)}</button>`;
-  return `<div class="${cls}" data-id="${t.id}"><div class="t-time" data-act="${sel?'sel-toggle':'edit'}">${time}</div><div class="t-rail"></div>${check}<button class="t-main" data-act="${sel?'sel-toggle':'edit'}"><span class="t-title">${esc(t.title)}</span>${t.output?`<span class="t-out">产出：${esc(t.output)}</span>`:''}<span class="t-meta">${meta.join('')}</span></button>${sel?'<span></span>':`<button class="t-more" data-act="more" aria-label="更多操作">${svg(P.dots,2.4)}</button>`}</div>`;}
+  return `<div class="${cls}" data-id="${t.id}"><div class="t-time" data-act="${sel?'sel-toggle':'edit'}">${time}</div><div class="t-rail"></div>${check}<button class="t-main" data-act="${sel?'sel-toggle':'edit'}"><span class="t-title">${esc(t.title)}</span>${t.output?`<span class="t-out">产出：${esc(t.output)}</span>`:''}<span class="t-meta">${meta.join('')}</span></button>${sel||!isActive(t)?'<span></span>':`<button class="t-timer${t.timerStart?' on':''}" data-act="timer-toggle" aria-label="${t.timerStart?'暂停计时':'开始计时'}：${esc(t.title)}">${svg(t.timerStart?P.pause:P.play,2.4)}</button>`}${sel?'<span></span>':`<button class="t-more" data-act="more" aria-label="更多操作">${svg(P.dots,2.4)}</button>`}</div>`;}
 function emptyDay(d){const ex=['明天上午9点 组会 1小时','下午3点到5点 写论文','周五 交周报 半小时','本周目标 完成第三章初稿'];
   return `<div class="empty"><h3>${d===today()?'今天':'这天'}还没有任务</h3><p>在下面的输入框打字，或者点麦克风直接说。日期、时间和时长会自动识别；几件事可以用「然后」连着说，会按顺序排好。</p><div class="chips">${ex.map(x=>`<button class="chip" data-act="ex-fill" data-text="${esc(x)}">${esc(x)}</button>`).join('')}</div><button class="tb" data-act="load-samples">${svg(P.plus)}放几条示例任务试试</button></div>`;}
 
@@ -1109,6 +1153,7 @@ function openMore(id){const t=S.tasks.get(id);if(!t)return;
       ${t.day!=='backlog'?'<button data-act="mm-backlog">放进待安排</button>':''}
       ${t.status!=='partial'?'<button data-act="mm-partial">标记为部分完成</button>':''}
       ${t.status!=='skipped'?'<button data-act="mm-skip">不做了（放弃）</button>':''}
+      ${isActive(t)?`<button data-act="mm-timer">${t.timerStart?'暂停计时':'开始计时'}</button>${t.timerStart||t.tracked?'<button data-act="mm-finish">结束计时并完成</button>':''}`:''}
       <button data-act="mm-edit">编辑详情</button>
       <button data-act="mm-del" class="danger">删除</button></div>`,
     on:{
@@ -1117,6 +1162,8 @@ function openMore(id){const t=S.tasks.get(id);if(!t)return;
       'mm-backlog'(){mv([{id,day:'backlog',start:null}],'已放进待安排');return false;},
       'mm-partial'(){const snaps=snap([id]);Store.saveTask({...t,status:'partial',pct:t.pct||50});Sheet.close();renderAll();toast('已标记部分完成',{label:'撤销',fn:()=>restore(snaps)});return false;},
       'mm-skip'(){const snaps=snap([id]);Store.saveTask({...t,status:'skipped'});Sheet.close();renderAll();toast('已放弃这项任务',{label:'撤销',fn:()=>restore(snaps)});return false;},
+      'mm-timer'(){Sheet.close(true);const c=S.tasks.get(id);if(c&&c.timerStart){pauseTimer(c);renderAll();toast('已暂停计时');}else startTimer(id);return false;},
+      'mm-finish'(){Sheet.close(true);finishTimer(id);return false;},
       'mm-edit'(){Sheet.close(true);openEdit(id);return false;},
       'mm-del'(){const snaps=snap([id]);Store.deleteTask(id);Sheet.close();renderAll();toast('已删除',{label:'撤销',fn:()=>restore(snaps)});return false;}
     }});}
@@ -1141,6 +1188,7 @@ function openEdit(id){const t0=S.tasks.get(id);if(!t0)return;if(t0.kind==='goal'
       <div class="chips"><button class="chip" data-act="ed-adhoc" aria-pressed="${st.adhoc}">临时任务</button>${st.start!=null&&st.day!=='backlog'?`<button class="chip" data-act="ed-ripple" aria-pressed="${st.ripple}">保存时顺延后面冲突的任务</button>`:''}</div>
       <div class="field"><label for="edNote">备注</label><textarea id="edNote" class="inp" rows="2" data-k="note">${esc(st.note)}</textarea></div>
       ${t0.postponed?`<p class="tip">这项已经推迟过 ${t0.postponed} 次。</p>`:''}
+      ${(()=>{const c=S.tasks.get(id)||t0;return (c.tracked||c.timerStart)?`<div class="field"><span class="lab">计时记录 · 共 ${fmtDur(Math.round(trackedMs(c)/60000))}</span><p class="tip" style="margin:0">${sessionsText(c)}</p><div class="chips"><button class="chip" data-act="ed-resettimer">清零计时</button></div></div>`:'';})()}
       <div id="sh-preview">${preview(st)}</div>`;},
     preview,
     foot:st=>`<button class="btn danger" data-act="ed-del">${st.confirmDel?'再点一次删除':'删除'}</button><button class="btn primary" data-act="ed-save">保存</button>`,
@@ -1149,7 +1197,7 @@ function openEdit(id){const t0=S.tasks.get(id);if(!t0)return;if(t0.kind==='goal'
     on:{
       'ed-day'(el,st){st.day=el.dataset.v;if(st.day==='backlog')st.start=null;},'ed-notime'(el,st){st.start=null;st.ripple=false;},
       'ed-dur'(el,st){st.dur=+el.dataset.v;},'ed-status'(el,st){st.status=el.dataset.v;},'ed-pct'(el,st){st.pct=+el.dataset.v;},
-      'ed-goal'(el,st){st.goalId=el.dataset.v||null;},'ed-actual'(el,st){st.actual=+el.dataset.v;},'ed-ev'(el,st){st.ev=st.ev===el.dataset.v?null:el.dataset.v;},'ed-adhoc'(el,st){st.adhoc=!st.adhoc;},'ed-ripple'(el,st){st.ripple=!st.ripple;},
+      'ed-goal'(el,st){st.goalId=el.dataset.v||null;},'ed-resettimer'(el,st){const c=S.tasks.get(id);if(c){Store.saveTask({...c,timerStart:null,tracked:0,sessions:[]});renderAll();toast('计时已清零');}},'ed-actual'(el,st){st.actual=+el.dataset.v;},'ed-ev'(el,st){st.ev=st.ev===el.dataset.v?null:el.dataset.v;},'ed-adhoc'(el,st){st.adhoc=!st.adhoc;},'ed-ripple'(el,st){st.ripple=!st.ripple;},
       'ed-save'(el,st){const title=st.title.trim();if(!title){toast('任务名称不能为空');return false;}
         const t=S.tasks.get(id);if(!t){Sheet.close();return false;}
         const day=st.day,start=day==='backlog'?null:st.start;
@@ -1206,7 +1254,7 @@ function evalHTML(ev,act,i){const di=i!=null?` data-i="${i}"`:'';return `<div cl
 function openDone(id){const t0=S.tasks.get(id);if(!t0)return;
   const st={actual:t0.actual??null,ev:t0.ev||null,evNote:t0.evNote||''};
   Sheet.open({st,title:()=>`完成：${esc(t0.title)}`,
-    body:st=>`${t0.output?`<p class="sr-out" style="margin:0">计划产出：${esc(t0.output)}</p>`:''}<p class="tip">计划 ${fmtDur(t0.dur)}${t0.start!=null?` · ${fmtHM(t0.start)}–${fmtHM(t0.start+(t0.dur||0))}`:''}</p>
+    body:st=>`${t0.output?`<p class="sr-out" style="margin:0">计划产出：${esc(t0.output)}</p>`:''}<p class="tip">计划 ${fmtDur(t0.dur)}${t0.start!=null?` · ${fmtHM(t0.start)}–${fmtHM(t0.start+(t0.dur||0))}`:''}${t0.tracked?` · 计时 ${fmtDur(Math.round(t0.tracked/60000))}`:''}</p>${t0.sessions&&t0.sessions.length?`<p class="tip" style="margin-top:-8px">${sessionsText(t0)}</p>`:''}
       <div class="field"><span class="lab">实际花了多久</span>${actualHTML(t0.dur,st.actual,'dn-actual')}</div>
       <div class="field"><span class="lab">完成得怎么样</span>${evalHTML(st.ev,'dn-ev')}</div>
       <div class="field"><label for="dnNote">评价 / 心得</label><div class="withmic"><textarea id="dnNote" class="inp" rows="2" data-k="evNote" placeholder="比如：比预想难，下次多留点时间">${esc(st.evNote)}</textarea>${micBtn('#dnNote')}</div></div>`,
@@ -1333,7 +1381,10 @@ const ACT={
   'day-prev':()=>goDay(addDays(S.day,-1)),'day-next':()=>goDay(addDays(S.day,1)),'day-today':()=>goDay(today()),'day-pick':el=>goDay(el.dataset.d),
   'week-prev':()=>goWeek(addDays(S.week,-7)),'week-next':()=>goWeek(addDays(S.week,7)),'week-today':()=>goWeek(monday(today())),
   'open-day':el=>goDay(el.dataset.d),
-  'toggle':el=>{const t=taskOf(el);if(!t)return;const done=t.status!=='done';Store.saveTask({...t,status:done?'done':'todo'});renderAll();if(done)toast(`已完成「${t.title}」`,{label:'记录用时和评价',fn:()=>openDone(t.id)},7000);},
+  'toggle':el=>{let t=taskOf(el);if(!t)return;const done=t.status!=='done';if(done&&t.timerStart)t=pauseTimer(t);Store.saveTask({...t,status:done?'done':'todo'});renderAll();if(done)toast(t.tracked?`已完成「${t.title}」，计时 ${fmtDur(Math.round(t.tracked/60000))}`:`已完成「${t.title}」`,{label:t.tracked?'写评价':'记录用时和评价',fn:()=>openDone(t.id)},7000);},
+  'timer-toggle':el=>{const t=taskOf(el);if(!t)return;if(t.timerStart){const u=pauseTimer(t);renderAll();toast(`已暂停，累计 ${fmtDur(Math.round(u.tracked/60000))}`);}else startTimer(t.id);},
+  'timer-pause':el=>{const t=taskOf(el);if(!t)return;const u=pauseTimer(t);renderAll();toast(`已暂停「${t.title}」，累计 ${fmtDur(Math.round(u.tracked/60000))}`);},
+  'timer-finish':el=>{const t=taskOf(el);if(t)finishTimer(t.id);},
   'edit':el=>{const t=taskOf(el);if(t)openEdit(t.id);},
   'more':el=>{const t=taskOf(el);if(t)openMore(t.id);},
   'sel-toggle':el=>{const t=taskOf(el);if(!t||!S.sel)return;S.sel.has(t.id)?S.sel.delete(t.id):S.sel.add(t.id);renderAll();},
